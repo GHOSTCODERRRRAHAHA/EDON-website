@@ -1,0 +1,59 @@
+name: Deploy Website (Vercel)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect app
+        id: detect
+        run: |
+          if [ ! -f package.json ]; then
+            echo "no_app=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip (placeholder repo)
+        if: steps.detect.outputs.no_app == 'true'
+        run: echo "No app detected. Add website code to enable deploy."
+
+      - name: Setup Node
+        if: steps.detect.outputs.no_app != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install deps
+        if: steps.detect.outputs.no_app != 'true'
+        run: npm ci
+
+      - name: Pull Vercel env
+        if: steps.detect.outputs.no_app != 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "VERCEL_TOKEN is not set"
+            exit 1
+          fi
+          npx vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+
+      - name: Build
+        if: steps.detect.outputs.no_app != 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel build --prod --token=$VERCEL_TOKEN
+
+      - name: Deploy
+        if: steps.detect.outputs.no_app != 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
